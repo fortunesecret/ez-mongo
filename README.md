@@ -1,17 +1,20 @@
 # EZMongo
+
 ## Still in Development — Not Yet Published!
 
 EZMongo is a lightweight, easy-to-use JavaScript library for quickly setting up MongoDB clients. It simplifies MongoDB connections, schema handling, and CRUD operations with built-in middleware and event handling, making it easier to interact with MongoDB databases.
 
 ## Features
+
 - MongoDB Connection Management: Easy setup for MongoDB connections with automatic connection checks.
--Schema Creation & Model Management: Define schemas and models with Mongoose.
--CRUD Operations: Simplified create, read, update, and delete operations.
--Middleware Support: Attach middleware to any CRUD operation (before and after).
--Event-Driven Document Changes: Leverages EventEmitter for real-time events when documents are created, updated, or deleted.
--Document Cloning: Create deep copies of MongoDB documents, excluding the _id field to allow saving as new entries.
+- Schema Creation & Model Management: Define schemas and models with Mongoose.
+- CRUD Operations: Simplified create, read, update, and delete operations.
+- Middleware Support: Attach middleware to any CRUD operation (before and after).
+- Event-Driven Document Changes: Leverages EventEmitter for real-time events when documents are created, updated, or deleted.
+- Document Cloning: Create deep copies of MongoDB documents, excluding the _id field to allow saving as new entries.
 
 ## Installation
+
 First, install EZMongo using npm:
 
 ```bash
@@ -19,6 +22,7 @@ npm install ezmongo
 ```
 
 ## Getting Started
+
 Before you start, it's recommended to store your connection string and database credentials in environment variables. You can use the dotenv package to load these variables:
 
 ```bash
@@ -146,6 +150,19 @@ mongoConnection.use('afterCreate', async (document) => {
 
 Each MongoDocument emits events when a document is saved, updated, or deleted.
 
+There are predefined hooks in the MongoMiddleware class for you to use:
+
+```javascript
+    console.log(MongoMiddleware.Hooks.BEFORE_CREATE) //'beforeCreate',
+    console.log(MongoMiddleware.Hooks.AFTER_CREATE) //'afterCreate',
+    console.log(MongoMiddleware.Hooks.BEFORE_READ) //'beforeRead',
+    console.log(MongoMiddleware.Hooks.AFTER_READ) //'afterRead',
+    console.log(MongoMiddleware.Hooks.BEFORE_UPDATE) //'beforeUpdate',
+    console.log(MongoMiddleware.Hooks.AFTER_UPDATE) //'afterUpdate',
+    console.log(MongoMiddleware.Hooks.BEFORE_DELETE) //'beforeDelete',
+    console.log(MongoMiddleware.Hooks.AFTER_DELETE) //'afterDelete'
+```
+
 ```javascript
 const userDoc = await userCollection.findById('60b8d295f08e0c1a44357f1d');
 
@@ -156,10 +173,13 @@ userDoc.on('OnUpdate', (doc) => {
 
 // Update the document to trigger the event
 await userDoc.update({ age: 40 });
-Cloning Documents
+```
+
+## Cloning Documents
+
 You can create a copy of a document and save it as a new entry:
 
-javascript
+```javascript
 const userDoc = await userCollection.findById('60b8d295f08e0c1a44357f1d');
 
 // Create a deep copy of the document
