@@ -1,5 +1,7 @@
 # EZMongo
 
+## Still in development, and not yet published!!
+
 **EZMongo** is a lightweight, easy-to-use JavaScript library for quickly setting up MongoDB clients. It simplifies MongoDB connections, schema handling, and CRUD operations with built-in middleware and event handling.
 
 ## Features
