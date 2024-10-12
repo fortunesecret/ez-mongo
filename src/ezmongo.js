@@ -57,7 +57,6 @@ class MongoConnection
     }
 }
 
-
 class MongoCollection
 {
     constructor(collection)
@@ -69,67 +68,58 @@ class MongoCollection
     async create(document)
     {
         return MongoHelperClass.runCRUDOperation(
-            async () =>
-            {
-                const newDocument = new this.collection(document);
-                return newDocument.save();
-            },
+            async () => new this.collection(document).save(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_CREATE, after: MongoMiddleware.Hooks.AFTER_CREATE },
-            document
+            'create', document
         );
     }
 
-    // Find a document by its ID and return a MongoDocument instance
     async findById(id)
+    {
+        return MongoHelperClass.runCRUDOperation(
+            async () => this.collection.findById(id).exec(),
+            this.middleware,
+            { before: MongoMiddleware.Hooks.BEFORE_READ, after: MongoMiddleware.Hooks.AFTER_READ },
+            'read', id
+        );
+    }
+
+    async read(query = {}, projection = {}, options = {})
     {
         return MongoHelperClass.runCRUDOperation(
             async () =>
             {
-                const document = await this.collection.findById(id).exec();
-                if (!document)
-                {
-                    throw new Error(`Document with ID ${id} not found`);
-                }
-                return new MongoDocument(document); // Wrap it in MongoDocument
+                const documents = await this.collection.find(query, projection, options).exec();
+                return documents.map(doc => new MongoDocument(doc));
             },
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_READ, after: MongoMiddleware.Hooks.AFTER_READ },
-            id
+            'read', query, projection, options
         );
     }
 
-    async read(query = {}, projection = {}, options = {}) {
+    async readOne(query = {}, projection = {}, options = {})
+    {
         return MongoHelperClass.runCRUDOperation(
-            async () => {
-                const documents = await this.collection.find(query, projection, options).exec();
-                return documents.map(doc => new MongoDocument(doc)); // Wrap in MongoDocument
-            },
-            this.middleware,
-            { before: MongoMiddleware.Hooks.BEFORE_READ, after: MongoMiddleware.Hooks.AFTER_READ },
-            query, projection, options
-        );
-    }
-    
-    async readOne(query = {}, projection = {}, options = {}) {
-        return MongoHelperClass.runCRUDOperation(
-            async () => {
+            async () =>
+            {
                 const document = await this.collection.findOne(query, projection, options).exec();
-                return document ? new MongoDocument(document) : null; // Wrap in MongoDocument
+                return document ? new MongoDocument(document) : null;
             },
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_READ, after: MongoMiddleware.Hooks.AFTER_READ },
-            query, projection, options
+            'readOne', query, projection, options
         );
     }
-    
+
     async update(query, updateDoc, options = { new: true })
     {
         return MongoHelperClass.runCRUDOperation(
             async () => this.collection.findOneAndUpdate(query, updateDoc, options).exec(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_UPDATE, after: MongoMiddleware.Hooks.AFTER_UPDATE },
-            query, updateDoc, options
+            'update', query, updateDoc, options
         );
     }
 
@@ -139,7 +129,7 @@ class MongoCollection
             async () => this.collection.deleteOne(query).exec(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_DELETE, after: MongoMiddleware.Hooks.AFTER_DELETE },
-            query
+            'delete', query
         );
     }
 
@@ -149,7 +139,7 @@ class MongoCollection
             async () => this.collection.deleteMany(query).exec(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_DELETE, after: MongoMiddleware.Hooks.AFTER_DELETE },
-            query
+            'deleteMany', query
         );
     }
 
@@ -164,41 +154,42 @@ class MongoDocument extends EventEmitter
     constructor(document)
     {
         super();
-        this.originalDocument = document;  // Mongoose document instance
-        this.middleware = new MongoMiddleware(); // Add middleware to the document level
+        this.originalDocument = document;
+        this.middleware = new MongoMiddleware();
     }
 
-    async save() {
+    async save()
+    {
         return MongoHelperClass.runCRUDOperation(
-            async () => this.originalDocument.isNew ? this.originalDocument.save() : this.update(this.originalDocument),
+            async () => this.originalDocument.save(),
             this.middleware,
             this.originalDocument.isNew
                 ? { before: MongoMiddleware.Hooks.BEFORE_CREATE, after: MongoMiddleware.Hooks.AFTER_CREATE }
                 : { before: MongoMiddleware.Hooks.BEFORE_UPDATE, after: MongoMiddleware.Hooks.AFTER_UPDATE },
+            this.originalDocument.isNew ? 'create' : 'update',
             this.originalDocument
-        ).then((savedDocument) => {
+        ).then((savedDocument) =>
+        {
             this.emit(this.originalDocument.isNew ? 'OnCreate' : 'OnUpdate', this);
-            this.document = savedDocument;
             return savedDocument;
         });
     }
-    
-    // Perform a partial update
+
     async update(updatedFields)
     {
         return MongoHelperClass.runCRUDOperation(
             async () => this.originalDocument.constructor.findOneAndUpdate(
-                { _id: this.originalDocument._id },  // Find the document by ID
-                { $set: updatedFields },              // Only update the provided fields
-                { new: true }                         // Return the updated document
+                { _id: this.originalDocument._id },
+                { $set: updatedFields },
+                { new: true }
             ).exec(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_UPDATE, after: MongoMiddleware.Hooks.AFTER_UPDATE },
-            updatedFields
+            'update', updatedFields
         ).then((updatedDocument) =>
         {
-            this.emit('OnUpdate', this); // Trigger update event
-            this.originalDocument = updatedDocument; // Update the document instance
+            this.emit('OnUpdate', this);
+            this.originalDocument = updatedDocument;
             return updatedDocument;
         });
     }
@@ -206,29 +197,22 @@ class MongoDocument extends EventEmitter
     async delete()
     {
         return MongoHelperClass.runCRUDOperation(
-            async () => this.originalDocument.deleteOne(),  // Use Mongoose's delete method
+            async () => this.originalDocument.deleteOne(),
             this.middleware,
             { before: MongoMiddleware.Hooks.BEFORE_DELETE, after: MongoMiddleware.Hooks.AFTER_DELETE },
-            this.originalDocument
-        ).then((deletedDocument) =>
+            'delete', this.originalDocument
+        ).then((deleteResult) =>
         {
             this.emit('OnDelete', this);
-            return deletedDocument;
+            return deleteResult;
         });
     }
 
-
-    // Create a deep copy of the current document, returning a new MongoDocument instance
     copy()
     {
-        // Deep copy the document data (excluding _id to ensure a new document is created when saved)
-        const copiedData = JSON.parse(JSON.stringify(this.originalDocument._doc)); // Clone the document
-        delete copiedData._id; // Remove the _id field to make the copy independent
-
-        // Create a new Mongoose document from the copied data
+        const copiedData = JSON.parse(JSON.stringify(this.originalDocument._doc));
+        delete copiedData._id;
         const newMongooseDoc = new this.originalDocument.constructor(copiedData);
-
-        // Return a new MongoDocument instance wrapping the copied Mongoose document
         return new MongoDocument(newMongooseDoc);
     }
 
@@ -237,19 +221,9 @@ class MongoDocument extends EventEmitter
         this.middleware.use(when, fn);
     }
 
-    onSave(callback)
+    on(event, callback)
     {
-        this.on('OnSave', callback);
-    }
-
-    onUpdate(callback)
-    {
-        this.on('OnUpdate', callback);
-    }
-
-    onDelete(callback)
-    {
-        this.on('OnDelete', callback);
+        this.on(event, callback);
     }
 }
 
@@ -303,19 +277,16 @@ class MongoMiddleware
 
 class MongoHelperClass
 {
-
     static async runMiddleware(middleware, hook, ...args)
     {
         if (!middleware)
         {
             throw new Error('Middleware instance is required');
         }
-
         if (!MongoMiddleware.Hooks[hook])
         {
             throw new Error(`Invalid middleware hook: ${hook}`);
         }
-
         await middleware.run(hook, ...args);
     }
 
@@ -325,31 +296,27 @@ class MongoHelperClass
         {
             throw new Error('Invalid connection instance');
         }
-
         if (!connection.isConnected)
         {
             await connection.connect();
         }
     }
-    static async runCRUDOperation(operation, middleware, hooks, operationName, ...args) {
-        try {
-            // Before operation middleware
+
+    static async runCRUDOperation(operation, middleware, hooks, operationName, ...args)
+    {
+        try
+        {
             await this.runMiddleware(middleware, hooks.before, ...args);
-    
-            // Perform the operation (e.g., save, update, read)
             const result = await operation(...args);
-    
-            // After operation middleware
             await this.runMiddleware(middleware, hooks.after, result);
-    
             return result;
-        } catch (error) {
+        } catch (error)
+        {
             console.error(`Error during ${operationName} operation:`, error);
             throw error;
         }
-    }    
+    }
 }
-
 
 module.exports = {
     MongoConnection,
