@@ -1,0 +1,11 @@
+{
+  "name": "ez-mongo",
+  "version": "0.0.1",
+  "description": "A simplified way of interacting with MongoDB.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Chase Wille",
+  "license": "ISC"
+}
